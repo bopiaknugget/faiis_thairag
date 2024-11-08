@@ -17,7 +17,7 @@ logger.info("Logger initialized for Flask application")
 # Configuration for FAISS and vLLM hosts
 FAISS_DIMENSION = 1024  # Adjust based on your model's embedding dimension
 FAISS_INDEX_PATH = 'faiss_index.index'  # Path to save/load the FAISS index
-VLLM_HOST = os.environ.get('VLLM_HOST', '172.17.0.1:8000')
+#VLLM_HOST = os.environ.get('VLLM_HOST', '172.17.0.1:8000')
 
 
 # Initialize or load FAISS index
