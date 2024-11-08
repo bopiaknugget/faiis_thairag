@@ -189,7 +189,7 @@ def query():
     logger.info(f"Prompt: {prompt_chatml}")
 
     response = requests.post(
-        f'http://{VLLM_HOST}/v1/completions',
+        f'https://api.aieat.or.th/v1/completions',
         json={"model": ".", "prompt": prompt_chatml, "max_tokens": data.get("max_tokens", 512)}
     )
     return response.json()
