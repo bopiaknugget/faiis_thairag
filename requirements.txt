@@ -6,6 +6,6 @@ scikit-learn
 numpy
 openai==0.28
 requests
-faiss-cpu
+faiss-gpu
 
 
