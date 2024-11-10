@@ -39,14 +39,6 @@ logger.info("Successfully initialized FAISS index.")
 
 # Flask app setup
 app = Flask(__name__)
-logger.info("Successfully setup Flask Web Service.")
-
-logger.info("Loading... BAAI/bge-m3 embedding model")
-# Load BAAI/bge-m3 model and tokenizer
-bge_model = AutoModel.from_pretrained("BAAI/bge-m3")
-bge_tokenizer = AutoTokenizer.from_pretrained("BAAI/bge-m3")
-logger.info("Successfully loaded BAAI/bge-m3 embedding and tokenizer. Ready to serve.")
-
 #Use LaBSE for  effective embedding
 embedding_model = SentenceTransformer("sentence-transformers/LaBSE")
 # Function to generate embeddings
