@@ -1,18 +1,18 @@
+from sentence_transformers import SentenceTransformer
 from flask import Flask, request, jsonify, Response
-from transformers import AutoTokenizer, AutoModel
-import torch
-from sklearn.metrics.pairwise import cosine_similarity
-import requests
 import json
-import os
-import numpy as np
 import faiss
+import numpy as np
+from sklearn.metrics.pairwise import cosine_similarity
+import os
+import requests
 import logging
 
 logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', force=True)
 logger = logging.getLogger(__name__)
-
 logger.info("Logger initialized for Flask application")
+
+
 
 # Configuration for FAISS and vLLM hosts
 FAISS_DIMENSION = 1024  # Adjust based on your model's embedding dimension
@@ -47,13 +47,12 @@ bge_model = AutoModel.from_pretrained("BAAI/bge-m3")
 bge_tokenizer = AutoTokenizer.from_pretrained("BAAI/bge-m3")
 logger.info("Successfully loaded BAAI/bge-m3 embedding and tokenizer. Ready to serve.")
 
-
+#Use LaBSE for  effective embedding
+embedding_model = SentenceTransformer("sentence-transformers/LaBSE")
 # Function to generate embeddings
 def generate_embedding(text):
-    inputs = bge_tokenizer(text, return_tensors="pt", padding=True, truncation=True)
-    with torch.no_grad():
-        embeddings = bge_model(**inputs).pooler_output
-    return embeddings.numpy().flatten()
+    embedding = embedding_model.encode(text)  # Returns a NumPy array
+    return embedding.astype("float32")  # Ensuring FAISS compatibility
 
 
 # Rerank documents based on cosine similarity
