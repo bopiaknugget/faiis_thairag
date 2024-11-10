@@ -164,34 +164,64 @@ def list_documents():
 def query():
     data = request.get_json()
     query_text = data.get("prompt", "")
+    
+    # Initialize conversation history
+    conversation_history = ""
+    
+    # Loop to continue conversation based on user inputs
+    while True:
+        # Generate query embedding
+        query_embedding = generate_embedding(query_text)
 
-    # Generate query embedding
-    query_embedding = generate_embedding(query_text)
+        # Perform similarity search with FAISS
+        D, I = faiss_index.search(np.array([query_embedding]), k=10)
+        retrieved_documents = [documents[i] for i in I[0] if i != -1]
 
-    # Perform similarity search with FAISS
-    D, I = faiss_index.search(np.array([query_embedding]), k=10)
-    retrieved_documents = [documents[i] for i in I[0] if i != -1]
+        # Re-rank retrieved documents
+        document_embeddings = [doc['embedding'] for doc in retrieved_documents]
+        ranked_indices = rerank_documents(query_embedding, np.array(document_embeddings))
+        top_documents = [retrieved_documents[i] for i, _ in ranked_indices[:3]]
 
-    # Re-rank retrieved documents
-    document_embeddings = [doc['embedding'] for doc in retrieved_documents]
-    ranked_indices = rerank_documents(query_embedding, np.array(document_embeddings))
-    top_documents = [retrieved_documents[i] for i, _ in ranked_indices[:3]]
+        # Generate response (similar to your VLLM interaction code)
+        system_prompt = os.environ.get(
+            'SYSTEM_PROMPT',
+            'คุณคือ OpenThaiGPT พัฒนาโดยสมาคมผู้ประกอบการปัญญาประดิษฐ์ประเทศไทย (AIEAT)'
+        )
+        
+        prompt = f"จากเอกสารต่อไปนี้\n\n"
+        prompt += "\n\n".join([doc.get('text') for doc in top_documents])
+        prompt += f"\n\nจงตอบคำถามต่อไปนี้: {query_text}"
 
-    # Generate response (similar to your VLLM interaction code)
-    system_prompt = os.environ.get('SYSTEM_PROMPT',
-                                   'คุณคือ OpenThaiGPT พัฒนาโดยสมาคมผู้ประกอบการปัญญาประดิษฐ์ประเทศไทย (AIEAT)')
-    prompt = f"จากเอกสารต่อไปนี้\n\n"
-    prompt += "\n\n".join([doc.get('text') for doc in top_documents])
-    prompt += f"\n\nจงตอบคำถามต่อไปนี้: {query_text}"
+        prompt_chatml = f"<|im_start|>system\nคุณคือผู้ช่วยตอบคำถามที่ฉลาดและซื่อสัตย์ {system_prompt}<|im_end|>\n<|im_start|>user\n{prompt}<|im_end|>\n<|im_start|>assistant\n"
+        logger.info(f"Prompt: {prompt_chatml}")
+        
+        response = requests.post(
+            'https://api.aieat.or.th/v1/completions',
+            json={
+                "model": ".",
+                "prompt": prompt_chatml,
+                "max_tokens": data.get("max_tokens", 1024),
+                "temperature": 0.7,
+                "top_p": 0.8,
+                "top_k": 40
+            }
+        )
+        
+        # Extract and decode the response text for Thai language
+        response_text = response.json().get("choices", [{}])[0].get("text", "")
+        
+        # Append response to conversation history and output it
+        conversation_history += f"\nUser: {query_text}\nAssistant: {response_text}\n"
+        
+        # Return response to user and prepare for next input
+        print(f"Assistant: {response_text}")
+        query_text = input("User: ")  # Get next user input (this is for looped, conversational mode)
 
-    prompt_chatml = f"<|im_start|>system\nคุณคือผู้ช่วยตอบคำถามที่ฉลาดและซื่อสัตย์ {system_prompt}<|im_end|>\n<|im_start|>user\n{prompt}<|im_end|>\n<|im_start|>assistant\n"
-    logger.info(f"Prompt: {prompt_chatml}")
-
-    response = requests.post(
-        f'https://api.aieat.or.th/v1/completions',
-        json={"model": ".", "prompt": prompt_chatml, "max_tokens": data.get("max_tokens", 512)}
-    )
-    return response.json()
+        # Break condition if user decides to end conversation
+        if query_text.lower() in ["exit", "quit"]:
+            break
+    
+    return {"conversation_history": conversation_history}
 
 
 # Run the app
