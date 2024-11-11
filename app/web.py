@@ -1,4 +1,4 @@
-from sentence_transformers import SentenceTransformer
+    from sentence_transformers import SentenceTransformer
 from flask import Flask, request, jsonify, Response
 import json
 import faiss
@@ -174,23 +174,43 @@ def query():
         ranked_indices = rerank_documents(query_embedding, np.array(document_embeddings))
         top_documents = [retrieved_documents[i] for i, _ in ranked_indices[:3]]
 
-        # Generate response (similar to your VLLM interaction code)
+        
+     # Get the system prompt from the environment variable or use the default
         system_prompt = os.environ.get(
             'SYSTEM_PROMPT',
             'คุณคือ OpenThaiGPT พัฒนาโดยสมาคมผู้ประกอบการปัญญาประดิษฐ์ประเทศไทย (AIEAT)'
         )
-        
-        prompt = f"จากเอกสารต่อไปนี้\n\n"
-        prompt += "\n\n".join([doc.get('text') for doc in top_documents])
-        prompt += f"\n\nจงตอบคำถามต่อไปนี้: {query_text}"
 
-        prompt_chatml = f"<|im_start|>system\nคุณคือผู้ช่วยตอบคำถามที่ฉลาดและซื่อสัตย์ {system_prompt}<|im_end|>\n<|im_start|>user\n{prompt}<|im_end|>\n<|im_start|>assistant\n"
+        # Construct a detailed system message
+        system_message = (
+            f"คุณคือผู้ช่วย AI ที่มีความเชี่ยวชาญและซื่อสัตย์ {system_prompt} "
+            "งานของคุณคือการอ่านเอกสารที่ให้มาและตอบคำถามตามข้อมูลในเอกสารนั้น "
+            "หากคุณไม่พบคำตอบในเอกสาร ให้แจ้งผู้ใช้ว่าคุณไม่สามารถหาคำตอบได้จากข้อมูลที่มี"
+        )
+
+        # Combine the top documents into a single text block
+        documents_text = "\n\n".join([doc.get('text') for doc in top_documents])
+
+        # Construct the user prompt with explicit instructions
+        prompt = (
+            f"จากเอกสารต่อไปนี้:\n\n{documents_text}\n\n"
+            f"กรุณาตอบคำถามต่อไปนี้โดยอ้างอิงจากข้อมูลในเอกสารเท่านั้น: {query_text}"
+        )
+
+        # Build the final prompt in the chat format
+        prompt_chatml = (
+            f"<|im_start|>system\n{system_message}<|im_end|>\n"
+            f"<|im_start|>user\n{prompt}<|im_end|>\n"
+            f"<|im_start|>assistant\n"
+        )
+
         logger.info(f"Prompt: {prompt_chatml}")
-        
+
+        # Make the API request
         response = requests.post(
             'https://api.aieat.or.th/v1/completions',
             json={
-                "model": ".",
+                "model": ".",  # Replace with the appropriate model identifier
                 "prompt": prompt_chatml,
                 "max_tokens": data.get("max_tokens", 1024),
                 "temperature": 0.7,
